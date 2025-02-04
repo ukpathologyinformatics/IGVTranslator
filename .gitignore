@@ -1,0 +1,8 @@
+.DS_Store
+.idea
+.venv
+*.spec
+build
+dist
+__pycache__
+*.over.chain*
