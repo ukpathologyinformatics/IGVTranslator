@@ -11,6 +11,9 @@ def preferences_window():
             Sg.Text("IGV Port"),
             Sg.Input(default_text=Config.get_igv_port(), key="IGVPORT", size=(12, 1)),
         ], [
+            Sg.Text("Server Listening Port"),
+            Sg.Input(default_text=Config.get_server_port(), key="SERVERPORT", size=(12, 1)),
+        ], [
             Sg.Checkbox("Autostart Server", default=Config.get_autostart(), key="AUTOSTART"),
         ], [
             Sg.Text('Liftover Chain File:'),
@@ -30,6 +33,7 @@ def preferences_window():
             break
         if event == '-SAVECHANGES-':
             Config.set_igv_port(values["IGVPORT"])
+            Config.set_server_port(values["SERVERPORT"])
             Config.set_autostart(values["AUTOSTART"])
             Config.set_chain_file(values['CHAINFILEPATH'])
             Lifter.load_chain(values['CHAINFILEPATH'])

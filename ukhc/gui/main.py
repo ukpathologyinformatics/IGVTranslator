@@ -9,7 +9,7 @@ from ukhc.application import Config, Lifter, AddressTranslator, IGVRedirectionSe
 from .icon import get_gui_icon
 from .preferences import preferences_window
 
-scrape = re.compile(r'.*(?P<coord>chr[^:]+:[0-9]+).*')
+scrape = re.compile(r"(?P<chrom>((?:chr)?[0-9xXyY]+))(?::(?P<coord>[0-9]+))(?:-(?P<sec_coord>[0-9]+))?", re.IGNORECASE)
 
 
 def main_window():
@@ -46,7 +46,7 @@ def main_window():
             Sg.Text('Liftover source coordinate(s) into different refrence genome .bam file in IGV'),
         ], [
             Sg.Text('Expected IGV Port: '),
-            Sg.Text(Config.get_igv_port(60151), key='CURRENTIGVPORT'),
+            Sg.Text(Config.get_igv_port(), key='CURRENTIGVPORT'),
         ], [
             [
                 Sg.Text('Last Lifted & Opened:', size=(17, 1)),
@@ -100,23 +100,35 @@ def main_window():
                 coordinate_to_open = values['SOURCECOORDINATE']
                 window.Element('SOURCECOORDINATE').update('')
                 try:
-                    search = scrape.match(coordinate_to_open)
+                    search = re.search(scrape, coordinate_to_open)
                     if not search:
-                        Sg.Popup("Error", "Did not find chr#:### coordinate in input, please copy again from Fabric")
+                        Sg.Popup("Error", "Did not find coordinate in input, please copy again")
                     else:
+                        chrom = search.group('chrom')
+                        if not chrom.startswith('chr'):
+                            chrom = "chr" + chrom
                         coord = search.group('coord')
-                        if not coord.startswith('chr'):
-                            coord = "chr" + coord
-                        input_parts = coord.split(":")
-                        try:
-                            output = Lifter.liftover_coordinate(input_parts[0], int(input_parts[1]))
-                            webbrowser.open(f"http://localhost:{Config.get_igv_port()}/goto?locus={':'.join(output)}")
-                            window.Element('LASTLIFTED').update(f"{':'.join(input_parts)} (Source) -> {':'.join(output)} (Lifted)")
-                        except IndexError:
-                            Sg.Popup("Error", f"Coordinate {input_parts[0]}:{input_parts[1]} did not lift over")
+                        sec_coord = search.group('sec_coord')
+                        if sec_coord == coord:
+                            sec_coord = None
+                        if sec_coord is None:
+                            try:
+                                output = Lifter.liftover_coordinate(chrom, int(coord))
+                                webbrowser.open(f"http://localhost:{Config.get_igv_port()}/goto?locus={':'.join(output)}")
+                                window.Element('LASTLIFTED').update(f"{chrom}:{coord} (Source) -> {':'.join(output)} (Lifted)")
+                            except IndexError:
+                                Sg.Popup("Error", f"Coordinate {chrom}:{coord} did not lift over")
+                        else:
+                            try:
+                                lifted_start = Lifter.liftover_coordinate(chrom, int(coord))
+                                lifted_end = Lifter.liftover_coordinate(chrom, int(sec_coord))
+                                webbrowser.open(f"http://localhost:{Config.get_igv_port()}/goto?locus={':'.join(lifted_start)}-{lifted_end[1]}")
+                                window.Element('LASTLIFTED').update(f"{chrom}:{coord}-{sec_coord} (Source) -> {':'.join(lifted_start)}-{lifted_end[1]} (Lifted)")
+                            except IndexError:
+                                Sg.Popup("Error", f"Coordinate {chrom}:{coord}-{sec_coord} did not lift over")
                 except Exception as e:
                     tb = traceback.format_exc()
                     Sg.Print(f'An error happened. Here is the info:', e, tb)
-        window.Element('CURRENTIGVPORT').update(Config.get_igv_port(60151))
+        window.Element('CURRENTIGVPORT').update(Config.get_igv_port())
         window.Refresh()
     window.close()

@@ -10,21 +10,27 @@ class ConfigException(Exception):
 
 class Config(object):
     config_file = Dirs.get_app_path('config.yml')
-    igv_port = None
+    igv_port = 60151
+    server_port = 60152
     chain_file = None
     autostart = False
 
     @staticmethod
-    def get_igv_port(if_empty: int = 60151):
-        return Config.igv_port if Config.igv_port is not None and Config.igv_port != '' else if_empty
-
-    @staticmethod
-    def is_igv_port_valid_for_server():
-        return Config.igv_port is not None and Config.igv_port != '' and Config.igv_port != 60151
+    def get_igv_port():
+        return int(Config.igv_port)
 
     @staticmethod
     def set_igv_port(igv_port):
         Config.igv_port = igv_port
+        Config.save_config()
+
+    @staticmethod
+    def get_server_port():
+        return int(Config.server_port)
+
+    @staticmethod
+    def set_server_port(server_port):
+        Config.server_port = server_port
         Config.save_config()
 
     @staticmethod
@@ -50,6 +56,7 @@ class Config(object):
         yaml.safe_dump(
             {
                 'igv_port': Config.igv_port,
+                'server_port': Config.server_port,
                 'chain_file': Config.chain_file,
                 'autostart': Config.autostart,
             },
@@ -59,7 +66,8 @@ class Config(object):
 
     @staticmethod
     def load_config():
-        Config.igv_port = None
+        Config.igv_port = 60151
+        Config.server_port = 60152
         Config.chain_file = None
         Config.autostart = False
         try:
@@ -69,6 +77,8 @@ class Config(object):
                 return
             if 'igv_port' in conf:
                 Config.igv_port = conf['igv_port']
+            if 'server_port' in conf:
+                Config.server_port = conf['server_port']
             if 'chain_file' in conf:
                 Config.chain_file = conf['chain_file']
             if 'autostart' in conf:
