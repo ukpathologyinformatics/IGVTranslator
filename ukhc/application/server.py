@@ -1,7 +1,7 @@
 import re
 import threading
 
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional
 
 from ukhc.application import Config, Lifter
@@ -18,24 +18,43 @@ class AddressTranslator:
 
     @staticmethod
     def translate_address(address: str) -> Optional[str]:
-        search = igv_link_parser.match(address)
-        if not search:
+        try:
+            search = igv_link_parser.match(address)
+            if not search:
+                return None
+            lifted_start = Lifter.liftover_coordinate('chr' + search.group('chrom'), int(search.group('start')))
+            lifted_end = Lifter.liftover_coordinate('chr' + search.group('chrom'), int(search.group('end')))
+            AddressTranslator.window.Element('LASTLIFTED').update(f"{search.group('chrom')}:{search.group('start')}-" +
+                                                                  f"{search.group('end')} (source) -> " +
+                                                                  f"{':'.join(lifted_start)}-{lifted_end[1]} (lifted)")
+            return (f"http://localhost:{Config.get_igv_port()}/goto?locus={search.group('chrom')}:" +
+                    f"{lifted_start[1]}-{lifted_end[1]}")
+        except:
             return None
-        lifted_start = Lifter.liftover_coordinate('chr' + search.group('chrom'), int(search.group('start')))
-        lifted_end = Lifter.liftover_coordinate('chr' + search.group('chrom'), int(search.group('end')))
-        AddressTranslator.window.Element('LASTLIFTED').update(f"{search.group('chrom')}:{search.group('start')}-" +
-                                                              f"{search.group('end')} (source) -> " +
-                                                              f"{':'.join(lifted_start)}-{lifted_end[1]} (lifted)")
-        return (f"http://localhost:{Config.get_igv_port()}/goto?locus={search.group('chrom')}:" +
-                f"{lifted_start[1]}-{lifted_end[1]}")
 
 
-class LiftoverAndRedirect(SimpleHTTPRequestHandler):
+class LiftoverAndRedirect(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
     def do_GET(self):
         if Lifter.is_chain_file_set():
-            self.send_response(303)
-            self.send_header('Location', AddressTranslator.translate_address(self.path))
-            self.end_headers()
+            liftover_address = AddressTranslator.translate_address(self.path)
+            if liftover_address:
+                self.send_response(303)
+                self.send_header('Location', liftover_address)
+                self.end_headers()
+            else:
+                self.send_response(200, 'OK')
+                self.send_header('Content-type', 'html')
+                self.end_headers()
+                self.wfile.write(
+                    bytes("<html> <head><title> IGV Translator - Error </title> </head> <body>", 'UTF-8'))
+                self.wfile.write(
+                    bytes(
+                        f"<h1>Failed to liftover address: {self.path}</h1>",
+                        "UTF-8"))
+                self.wfile.write(bytes("</body></html>", 'UTF-8'))
         else:
             self.send_response(200, 'OK')
             self.send_header('Content-type', 'html')
@@ -43,7 +62,7 @@ class LiftoverAndRedirect(SimpleHTTPRequestHandler):
             self.wfile.write(
                 bytes("<html> <head><title> IGV Translator - Setup Error </title> </head> <body>", 'UTF-8'))
             self.wfile.write(
-                bytes("<p>You must set a chain file using File -> Preferences in the IGV Translator application.</p>",
+                bytes("<h1>You must set a chain file using File -> Preferences in the IGV Translator application.</h1>",
                       "UTF-8"))
             self.wfile.write(bytes("</body></html>", 'UTF-8'))
 
@@ -64,7 +83,7 @@ class IGVRedirectionServer:
         self.interface.Element('SERVERSTATUS').update(f"Listening on {Config.get_server_port()}")
 
     def stop_server(self):
-        self.server.shutdown()
+        setattr(self.server, '_BaseServer__shutdown_request', True)
         self.server.socket.close()
         self.server = None
         self.thread = None

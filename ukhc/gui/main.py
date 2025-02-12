@@ -6,7 +6,7 @@ import PySimpleGUI as Sg
 
 from ukhc.application import Config, Lifter, AddressTranslator, IGVRedirectionServer
 
-from .icon import get_gui_icon
+from .icon import get_gui_icon256
 from .preferences import preferences_window
 
 scrape = re.compile(r"(?P<chrom>((?:chr)?[0-9xXyY]+))(?::(?P<coord>[0-9]+))(?:-(?P<sec_coord>[0-9]+))?", re.IGNORECASE)
@@ -65,7 +65,7 @@ def main_window():
         ]
     ]
 
-    window = Sg.Window('IGV Translator', layout, icon=get_gui_icon(), finalize=True)
+    window = Sg.Window('IGV Translator', layout, icon=get_gui_icon256(), finalize=True)
     window['SOURCECOORDINATE'].bind("<Return>", "_Enter")
     AddressTranslator.set_interface(window)
     server.set_interface(window)
